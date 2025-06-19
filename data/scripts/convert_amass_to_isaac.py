@@ -28,18 +28,19 @@ from datetime import timedelta
 
 TMP_SMPL_DIR = "/tmp/smpl"
 
+SMPL_DATASETS_NAME_DICT = {"ACCAD": "ACCAD", "BMLmovi": "BMLmovi", "BioMotionLab_NTroje": "BMLrub", "CMU": "CMU", "DFaust_67": "DFaust", "EKUT": "EKUT", "Eyes_Japan_Dataset": "Eyes_Japan_Dataset", "HumanEva": "HumanEva", "Transitions_mocap": "Transitions", "MPI_HDM05": "HDM05", "MPI_mosh": "MoSh", "MPI_Limits": "PosePrior", "KIT": "KIT", "SFU": "SFU", "SSM_synced": "SSM", "TotalCapture": "TotalCapture"}
 
 def main(
-    amass_root_dir: Path,
+    amass_root_dir: Path = "/home/halo/dataset_dl001/halo/AMASS_SMPLX",
     robot_type: str = None,
-    humanoid_type: str = "smpl",
+    humanoid_type: str = "smplx",
     force_remake: bool = False,
     force_neutral_body: bool = True,
     generate_flipped: bool = False,
     not_upright_start: bool = False,  # By default, let's start upright (for consistency across all models).
-    humanoid_mjcf_path: Optional[str] = None,
+    humanoid_mjcf_path: Optional[str] = "protomotions/data/assets/mjcf/smplx_humanoid.xml",
     force_retarget: bool = False,
-    output_dir: Path = None,
+    output_dir: Path = "data/amass",
 ):
     if output_dir is None:
         output_dir = amass_root_dir
@@ -125,8 +126,17 @@ def main(
     for folder_name in folder_names:
         if "retarget" in folder_name or "smpl" in folder_name or "h1" in folder_name:
             continue
+        if humanoid_type == "smpl" and (folder_name not in SMPL_DATASETS_NAME_DICT):
+                # Skip folders that are not in the SMPL datasets
+                continue
+
         data_dir = amass_root_dir / folder_name
-        save_dir = output_dir / f"{folder_name}-{append_name}"
+        if humanoid_type == "smpl":
+            # For SMPL, we use the original folder name
+            save_dir = output_dir / f"{SMPL_DATASETS_NAME_DICT[folder_name]}-{append_name}"
+        else:
+            # For SMPLX and SMPLH, we use the folder name as is
+            save_dir = output_dir / f"{folder_name}-{append_name}"
 
         all_files_in_folder = [
             f
@@ -164,11 +174,18 @@ def main(
         if "retarget" in folder_name or "smpl" in folder_name or "h1" in folder_name:
             # Ignore folders where we store motions retargeted to AMP
             continue
+        if humanoid_type == "smpl" and (folder_name not in SMPL_DATASETS_NAME_DICT):
+            # Skip folders that are not in the SMPL datasets
+            continue
 
         data_dir = amass_root_dir / folder_name
-        save_dir = amass_root_dir / f"{folder_name}-{append_name}"
+        if humanoid_type == "smpl":
+            # For SMPL, we use the original folder name
+            save_dir = output_dir / f"{SMPL_DATASETS_NAME_DICT[folder_name]}-{append_name}"
+        else:
+            # For SMPLX and SMPLH, we use the folder name as is
+            save_dir = output_dir / f"{folder_name}-{append_name}"
 
-        print(f"Processing subset {folder_name}")
         os.makedirs(save_dir, exist_ok=True)
 
         files = [
@@ -176,11 +193,11 @@ def main(
             for f in Path(data_dir).glob("**/*.[np][pk][lz]")
             if (f.name != "shape.npz" and "stagei.npz" not in f.name)
         ]
-        print(f"Processing {len(files)} files")
+        print(f"Processing subset {folder_name} with {len(files)} files")
 
         files.sort()
-
-        for filename in tqdm(files):
+        bar = tqdm(files)
+        for filename in bar:
             try:
                 relative_path_dir = filename.relative_to(data_dir).parent
                 outpath = (
@@ -202,7 +219,7 @@ def main(
                 # Create the output directory if it doesn't exist
                 os.makedirs(save_dir / relative_path_dir, exist_ok=True)
 
-                print(f"Processing {filename}")
+                # bar.set_description(f"Processing {folder_name}/{filename.name}")
                 if filename.suffix == ".npz":
                     motion_data = np.load(filename)
 
@@ -398,7 +415,6 @@ def main(
                         outpath = outpath.with_name(
                             outpath.stem + "_flipped" + outpath.suffix
                         )
-                    print(f"Saving to {outpath}")
                     if robot_type in ["h1", "g1"]:
                         torch.save(new_sk_motion, str(outpath))
                     else:
@@ -410,18 +426,19 @@ def main(
                     remaining_files = total_files_to_process - processed_files
                     estimated_time_remaining = avg_time_per_file * remaining_files
 
-                    print(
-                        f"\nProgress: {processed_files}/{total_files_to_process} files"
-                    )
-                    print(
-                        f"Average time per file: {timedelta(seconds=int(avg_time_per_file))}"
-                    )
-                    print(
-                        f"Estimated time remaining: {timedelta(seconds=int(estimated_time_remaining))}"
-                    )
-                    print(
-                        f"Estimated completion time: {time.strftime('%H:%M:%S', time.localtime(time.time() + estimated_time_remaining))}\n"
-                    )
+                    # bar.set_postfix(
+                    #     {"Progress": f"{processed_files}/{total_files_to_process} files"}
+                    # )
+                    # bar.set_postfix(
+                    #     {"Average time per file": timedelta(seconds=int(avg_time_per_file))}
+                    # )
+                    bar.set_description(f"Processing {filename.name} ({processed_files}/{total_files_to_process}), {int(estimated_time_remaining/60)} mins left")
+                    # bar.set_postfix(
+                        # {"Estimated time remaining": timedelta(seconds=int(estimated_time_remaining))}
+                    # )
+                    # bar.set_postfix(
+                    #     {"Estimated completion time": time.strftime('%H:%M:%S', time.localtime(time.time() + estimated_time_remaining))}
+                    # )
             except Exception as e:
                 print(f"Error processing {filename}")
                 print(f"Error: {e}")

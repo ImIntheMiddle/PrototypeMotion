@@ -29,6 +29,9 @@ for arg in sys.argv:
 
             simulator = "isaaclab"
 
+        elif "genesis" in arg.split("=")[-1]:
+            simulator = "genesis"
+
 import wandb  # noqa: E402
 from lightning.pytorch.loggers import WandbLogger  # noqa: E402
 import torch  # noqa: E402
