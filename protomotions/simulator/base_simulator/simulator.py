@@ -136,12 +136,17 @@ class Simulator(ABC):
             dtype=torch.long,
             device=self.device,
         )
-        
+
+        # import pdb; pdb.set_trace()
+        body_convert_to_sim = []
+        for body_name in body_ordering.body_names:
+            if body_name in self.robot_config.body_names:
+                body_convert_to_sim.append(
+                    self.robot_config.body_names.index(body_name)
+                )
+
         body_convert_to_sim = torch.tensor(
-            [
-                self.robot_config.body_names.index(body_name)
-                for body_name in body_ordering.body_names
-            ],
+            body_convert_to_sim,
             dtype=torch.long,
             device=self.device,
         )

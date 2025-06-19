@@ -14,7 +14,6 @@ from poselib.skeleton.skeleton3d import SkeletonMotion, SkeletonState
 
 HML3D_FPS = 20
 
-
 def amass_to_amassx(file_path):
                 file_path = file_path.replace("_poses", "_stageii")
                 file_path = file_path.replace("SSM_synced", "SSM")
@@ -73,20 +72,54 @@ def is_valid_motion(
 
     return True, None
 
+def is_pedestrian_label(labels, pedestrian_verbs, forbidden_verbs, num_rejected_labels=0):
+    """
+    Check if the labels contain pedestrian verbs or forbidden verbs.
+    If a forbidden verb is found, return False and increment the count.
+    If a pedestrian verb is found, return True and increment the count.
+    If no pedestrian verb is found, return False.
+    """
+    judge = False
+    is_judged = False
+    for label in labels:
+        if is_judged:
+            break  # If already judged, no need to check further
+        for forbidden_word in forbidden_verbs.keys():
+            if forbidden_word in label.lower():
+                print("Forbidden label found:", label)
+                forbidden_verbs[forbidden_word] += 1
+                num_rejected_labels += 1
+                # import pdb; pdb.set_trace()
+                is_judged = True
+        for pedestrian_word in pedestrian_verbs.keys():
+            if pedestrian_word in label.lower():  # lowercase to match case insensitivity
+                print("Pedestrian label found:", label)
+                pedestrian_verbs[pedestrian_word] += 1
+                # import pdb; pdb.set_trace()
+                judge = True
+                is_judged = True
+    # If no pedestrian label is found, return False
+    if not judge and not is_judged:
+        print("No pedestrian label found in:", labels)
+        num_rejected_labels += 1
+        # import pdb; pdb.set_trace()
+    return judge, pedestrian_verbs, forbidden_verbs, num_rejected_labels
 
 def main(
-    outfile: Path,
-    amass_data_path: Path,
+    outdir: Path = Path("data/yaml_files"),
+    outfile: Path = Path("smpl_hml3d_train.yaml"),
+    amass_data_path: Path = Path("data/amass"),
     text_dir: Path = Path("data/hml3d/texts"),
     csv_file: Path = Path("data/hml3d/index.csv"),
     hml3d_file: Path = Path("data/hml3d/train_val.txt"),
-    motion_fps_path: Path = Path("data/yaml_files/motion_fps_amass.yaml"),
+    motion_fps_path: Path = Path("data/yaml_files/motion_fps_smpl.yaml"),
     occlusion_data_path: Path = Path("data/amass/amass_copycat_occlusion_v3.pkl"),
     humanoid_type: str = "smpl",
     dataset: str = "",
     max_length_seconds: Optional[int] = None,  # 90
-    min_length_seconds: Optional[float] = 0.5,
+    min_length_seconds: Optional[float] = 3.2, # 0.5 default, 3.2 for past, 4.8 for future
     ignore_occlusions: bool = False,
+    ignore_non_pedestrian: bool = False,  # If true, only keep pedestrian labels
 ):
     """
     We need the babel file to get the duration of the clip
@@ -98,6 +131,29 @@ def main(
     total_time = 0
     total_motions = 0
     total_sub_motions = 0
+    pedestrian_verbs = {
+        " walk": 0,
+        " run": 0,
+        " jog": 0,
+        " sprint": 0,
+        " stride": 0,
+        " dash": 0,
+        " skip": 0,
+        " stand": 0,
+        " wave": 0,
+    }
+    forbidden_verbs = {
+        " sit": 0,
+        " lie": 0,
+        " lying": 0,
+        " crawl": 0,
+        " jump": 0,
+        " pick": 0,
+        " fall": 0,
+        " flap": 0,
+        " clap": 0,
+    }
+    num_rejected_labels = 0
 
     # load csv file
     df = pd.read_csv(csv_file)
@@ -205,6 +261,13 @@ def main(
             num_too_short += 1
             continue
 
+        if ignore_non_pedestrian:
+            is_pedestrian, pedestrian_verbs, forbidden_verbs, num_rejected_labels = is_pedestrian_label(
+                processed_labels, pedestrian_verbs, forbidden_verbs, num_rejected_labels
+            )
+            if not is_pedestrian:
+                continue
+
         if key not in output_motions:
             output_motions[key] = []
             total_motions += 1
@@ -251,7 +314,6 @@ def main(
 
         yaml_dict_format["motions"].append(item_dict)
 
-    print(f"Saving {len(output_motions)} motions to {outfile}")
     print(
         f"Total of {num_motions} motions, and {num_sub_motions} sub-motions, equaling to {total_time / 60} minutes of motion."
     )
@@ -260,7 +322,14 @@ def main(
     print(
         f"Num occluded: {options.occlusion}, occluded_bound: {options.occlusion_bound}"
     )
+    print(f"Num rejected labels: {num_rejected_labels}")
+    print(f"Pedestrian verbs stats: {pedestrian_verbs}: {sum(pedestrian_verbs.values())} total")
+    print(f"Forbidden verbs stats: {forbidden_verbs}: {sum(forbidden_verbs.values())} total")
 
+    print(f"Saving {len(output_motions)} motions to {outdir / outfile}")
+    if not outdir.exists():
+        outdir.mkdir(parents=True, exist_ok=True)
+    outfile = outdir / outfile
     with open(outfile, "w") as file:
         yaml.dump(yaml_dict_format, file)
 

@@ -252,7 +252,7 @@ class PPO:
 
                 for step in track(
                     range(self.num_steps),
-                    description=f"Epoch {self.current_epoch}, collecting data...",
+                    description=f"Epoch {self.current_epoch}/{self.config.max_epochs}, collecting data...",
                 ):
                     obs = self.handle_reset(done_indices)
                     self.experience_buffer.update_data("self_obs", step, obs["self_obs"])
@@ -394,7 +394,7 @@ class PPO:
 
         for batch_idx in track(
             range(self.max_num_batches()),
-            description=f"Epoch {self.current_epoch}, training...",
+            description=f"Epoch {self.current_epoch}/{self.config.max_epochs}, training...",
         ):
             iter_log_dict = {}
             dataset_idx = batch_idx % len(dataset)

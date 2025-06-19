@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import torch
+import numpy as np
 import typer
 import yaml
 import tempfile
@@ -27,11 +28,12 @@ OmegaConf.register_new_resolver("len_or_int_value", lambda lst: len(lst) if isin
 
 
 def main(
-        motion_file: Path,
-        amass_data_path: Path,
-        outpath: Path,
+        motion_file: Path = Path("data/yaml_files/smpl_hml3d_train.yaml"),
+        amass_data_path: Path = Path("data/amass"),
+        outpath: Path = Path("data/motions/smpl_packaged_motion.npy"),
         humanoid_type: str = "smpl",
         num_data_splits: int = None,
+        create_text_embeddings: bool = False,
 ):
     config_path = "../../protomotions/config/robot"
 
@@ -120,13 +122,15 @@ def main(
             key_body_ids=key_body_ids,
             device="cpu",
             skeleton_tree=None,
+            create_text_embeddings=create_text_embeddings,
             **motion_lib_params
         )
 
         print("Saving motion state")
 
         with open(outpath, "wb") as file:
-            torch.save(mlib.state, file)
+            # torch.save(mlib.state, file)
+            np.savez(file, state=mlib.state,)
 
         # Remove the temporary file
         os.unlink(temp_file_path)

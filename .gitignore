@@ -2,11 +2,18 @@
 .idea
 *__pycache__*
 *.egg-info
+*.obj
+*.pt
 outputs/*
+bin/*
+data/hml3d/*
 rendered_images/*
 *tmp*
 results/*
 .DS_Store
 **/.DS_Store
+*.npy
+data/hml3d/texts/*.txt
+*.pkl
 
 output/
