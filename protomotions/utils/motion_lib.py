@@ -19,6 +19,7 @@ from poselib.skeleton.skeleton3d import SkeletonMotion, SkeletonState
 # CT hack: remap phys_anim to protomotions for backwards compatibility of pre-existing motion files
 import sys
 import protomotions
+import poselib
 
 sys.modules['phys_anim'] = protomotions
 
@@ -102,6 +103,7 @@ class MotionLib(DeviceDtypeModuleMixin):
 
         if str(motion_file).split(".")[-1] in ["yaml", "npy", "npz", "np"]:
             print("Loading motions from yaml/npy file")
+            # import pdb; pdb.set_trace()
             self._load_motions(motion_file, target_frame_rate)
         else:
             rank = _get_rank()
@@ -110,9 +112,9 @@ class MotionLib(DeviceDtypeModuleMixin):
             # This is used for large motion files that are split across multiple GPUs
             motion_file = motion_file.replace("_slurmrank", f"_{rank}")
             print(f"Loading motions from state file: {motion_file}")
-
+            # torch.serialization.add_safe_globals([protomotions.utils.motion_lib.LoadedMotions, poselib.skeleton.skeleton3d.SkeletonMotion, poselib.skeleton.skeleton3d.SkeletonTree])
             with open(motion_file, "rb") as file:
-                state: LoadedMotions = torch.load(file, map_location="cpu")
+                state: LoadedMotions = torch.load(file, map_location="cpu", weights_only=False)
 
             # Create LoadedMotions instance with loaded state dict
             # We re-create to enable backwards compatibility. This allows LoadedMotions class to accept "None" values and set defaults if needed.

@@ -30,7 +30,7 @@ OmegaConf.register_new_resolver("len_or_int_value", lambda lst: len(lst) if isin
 def main(
         motion_file: Path = Path("data/yaml_files/smpl_hml3d_train.yaml"),
         amass_data_path: Path = Path("data/amass"),
-        outpath: Path = Path("data/motions/smpl_packaged_motion.npy"),
+        outpath: Path = Path("data/motions/smpl_packaged_motion.pt"),
         humanoid_type: str = "smpl",
         num_data_splits: int = None,
         create_text_embeddings: bool = False,
@@ -129,8 +129,7 @@ def main(
         print("Saving motion state")
 
         with open(outpath, "wb") as file:
-            # torch.save(mlib.state, file)
-            np.savez(file, state=mlib.state,)
+            torch.save(mlib.state, file)
 
         # Remove the temporary file
         os.unlink(temp_file_path)
